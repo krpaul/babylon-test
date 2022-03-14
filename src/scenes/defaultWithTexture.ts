@@ -15,8 +15,6 @@ import { Texture } from "@babylonjs/core/Materials/Textures/texture";
 import grassTextureUrl from "../../assets/grass.jpg";
 
 export class DefaultSceneWithTexture implements CreateSceneClass {
-    renderLoop = () => {};
-    
     createScene = async (
         engine: Engine,
         canvas: HTMLCanvasElement

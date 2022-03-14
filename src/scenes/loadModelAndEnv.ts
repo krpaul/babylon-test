@@ -20,8 +20,6 @@ import controllerModel from "../../assets/glb/samsung-controller.glb";
 import roomEnvironment from "../../assets/environment/room.env"
 
 export class LoadModelAndEnvScene implements CreateSceneClass {
-    renderLoop = () => {};
-
     createScene = async (
         engine: Engine,
         canvas: HTMLCanvasElement

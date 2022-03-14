@@ -3,7 +3,6 @@ type Scene = import("@babylonjs/core/scene").Scene;
 
 export interface CreateSceneClass {
     createScene: (engine: Engine, canvas: HTMLCanvasElement) => Promise<Scene>;
-    renderLoop: () => void;
     preTasks?: Promise<unknown>[];
 }
 

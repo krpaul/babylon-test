@@ -39,7 +39,6 @@ export const babylonInit = async (): Promise<void> => {
 
     // Register a render loop to repeatedly render the scene
     engine.runRenderLoop(function () {
-        createSceneModule.renderLoop();
         scene.render();
     });
 
