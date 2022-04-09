@@ -54,4 +54,15 @@ module.exports = {
             template: path.resolve(appDirectory, "public/index.html"),
         }),
     ],
+    externals: {
+        //oimo: ‘OIMO’, //or true
+        //cannon: ‘CANNON’ //or true
+        //“oimo”: true,
+        // "cannon": 'CANNON'
+        //“earcut”: true
+    }
 };
+
+// new webpack.ProvidePlugin({
+//     CANNON: 'cannon'
+// });
