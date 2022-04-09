@@ -112,57 +112,32 @@ class PhysicsSceneWithAmmo implements CreateSceneClass {
         
         const movingMeshes = result2.meshes
         movingMeshes[0].setParent(null)
-        
+
         fixedMeshes.forEach((m) => {
             m.physicsImpostor = new BABYLON.PhysicsImpostor(m, BABYLON.PhysicsImpostor.MeshImpostor, {
                 mass: 0, friction: 0.45
             }, scene)
         })
         
-        let numbersMesh: AbstractMesh, seperatorsMesh: AbstractMesh;
+        const numbersMesh = scene.getMeshByName("numbers"), 
+              seperatorsMesh = scene.getMeshByName("Seperator");
+
+        if (!numbersMesh || !seperatorsMesh) {
+            throw new Error("Could not find numbers or seperators mesh")
+        }
+
         let numberVerticesRaw: Vector3[] = [];
         let numberVertices: Vector3[] = [];
         let groupedVertices: Vector3[][] = [];
         let shuffledGroupedVertices: Vector3[][] = []
         
-        const defaultNumberRotation = new BABYLON.Quaternion(0, 1, 0, 0)
-        let sepMesh: AbstractMesh;
-
-        // movingMeshes.forEach((m) => {
-        //     if (m.name == "Seperator") {
-        //         // m.physicsImpostor = new BABYLON.PhysicsImpostor(m, BABYLON.PhysicsImpostor.MeshImpostor, {
-        //         //     mass: 0,
-        //         //     friction: 1000, restitution: 0,
-        //         //     damping: 0.1
-        //         // }, scene)
-        //         sepMesh = m
-        //     }
-        //     else if (m.name != "__root__") {
-        //         m.physicsImpostor = new BABYLON.PhysicsImpostor(m, BABYLON.PhysicsImpostor.MeshImpostor, {
-        //             mass: 0,
-        //             friction: 0.45, restitution: 0
-        //         }, scene)
-        //     }
-            
-        //     if (m.name == "numbers") {
-        //         numbersMesh = m
-        //     }
-
-        // })
+        const defaultNumberRotation = new BABYLON.Quaternion(0, 1, 0, 0);
 
         (movingMeshes[0] as any).physicsImposter = new BABYLON.PhysicsImpostor(movingMeshes[0], BABYLON.PhysicsImpostor.MeshImpostor, {
             mass: 0, friction: 0.45, restitution: 0
         }, scene)
 
         const calculateVertices = () => {
-            movingMeshes.forEach((m) => {
-                if (m.name == "numbers") {
-                    numbersMesh = m
-                } else if (m.name == "Seperator") {
-                    seperatorsMesh = m
-                }
-            })
-
             movingMeshes[0].rotationQuaternion = defaultNumberRotation.clone()
 
             const v = numbersMesh.getVerticesData(BABYLON.VertexBuffer.PositionKind)
@@ -259,7 +234,6 @@ class PhysicsSceneWithAmmo implements CreateSceneClass {
         // create lines 
         const lines: BABYLON.LinesMesh[] = [];
         const drawDebugLines = (noclear=false) => {
-            return;
             if (!noclear) lines.forEach((l) => {
                 l.dispose()
             })
@@ -285,10 +259,8 @@ class PhysicsSceneWithAmmo implements CreateSceneClass {
             }
         }
         
-        drawDebugLines()
-
         const drawSeperatorMeshBounds = () => {
-            const v = sepMesh.getVerticesData(BABYLON.VertexBuffer.PositionKind)!
+            const v = seperatorsMesh.getVerticesData(BABYLON.VertexBuffer.PositionKind)!
             const verticiesRaw: Vector3[] = [];
             
             for (let i = 0; i < v.length; i += 3) {
@@ -296,11 +268,6 @@ class PhysicsSceneWithAmmo implements CreateSceneClass {
                     Vector3.FromArray(v, i)
                 )
             }
-
-            // verticiesRaw.sort((a, b) => {
-            //     return a.x - b.x
-            // })
-
 
             for (let j = 0; j < verticiesRaw.length; j++) {
                 BABYLON.MeshBuilder.CreateLines("line", {
@@ -315,8 +282,6 @@ class PhysicsSceneWithAmmo implements CreateSceneClass {
 
             console.log(v)
         }
-
-        // drawSeperatorMeshBounds()
 
         // invisible barrier so that ball doesn't fly away to narnia
         const barrier = BABYLON.MeshBuilder.CreateBox("barrier", {
@@ -350,18 +315,6 @@ class PhysicsSceneWithAmmo implements CreateSceneClass {
             restitution: 0,
         }, scene);
 
-        // ball.physicsImpostor = new PhysicsImpostor(ball, BABYLON.PhysicsImpostor.SoftbodyImpostor, {
-        //     mass: 15,
-        //     // friction: 0.2,
-        //     // restitution: 0.9,
-        //     // pressure: 10,
-        //     // velocityIterations: 10, 
-        //     // positionIterations: 10,
-        //     // stiffness: 1,
-        //     // // margin: 0.1;
-        //     // damping: 0.05
-        // }, scene);
-
         ball.material = this.ballMaterial(scene)
         ball.actionManager = new BABYLON.ActionManager(scene);
 
@@ -370,7 +323,7 @@ class PhysicsSceneWithAmmo implements CreateSceneClass {
         
         const ballStart = new Vector3(2, 0.3, 0)
         const startAngularSpinSpeed: double = 0.03; // radians per frame
-        const angularSpinFriction: double = 0.00001//0.00001;   // - radians per frame per frame
+        const angularSpinFriction: double = 0.00001 // - radians per frame per frame
         let currFriction: double = 0;
 
         // Move the sphere 
@@ -385,12 +338,15 @@ class PhysicsSceneWithAmmo implements CreateSceneClass {
 
             ball.position = ballStart;
             ball.physicsImpostor?.setAngularVelocity( Vector3.Zero() );
-            ball.physicsImpostor?.setLinearVelocity( Vector3.Zero() );
+            ball.physicsImpostor?.setLinearVelocity( 
+                new Vector3(0, ballStart.y, 0)
+            );
 
             spin = true
             launchBall = true;
             currFriction = 0;
             checkResult = false;
+            landed = false;
 
             movingMeshes[0].rotationQuaternion = defaultNumberRotation.clone();
         }
@@ -424,68 +380,44 @@ class PhysicsSceneWithAmmo implements CreateSceneClass {
 
         let launchStopFrameCount = 0
         const stopFrame = 300;
-        let doOnce = true;
-        let amountRotated: double = 0;
 
         const mapping = [
             [36, 'red'], [13, 'black'], [27, 'red'], [6, 'black'], [34, 'red'], [17, 'black'], [25, 'red'], [2, 'black'], [21, 'red'], [4, 'black'], [19, 'red'], [15, 'black'], [32, 'red'], [0, 'green'], [26, 'black'], [3, 'red'], [35, 'black'], [12, 'red'], [28, 'black'], [7, 'red'], [29, 'black'], [18, 'red'], [22, 'black'], [9, 'red'], [31, 'black'], [14, 'red'], [20, 'black'], [1, 'red'], [33, 'black'], [16, 'red'], [24, 'black'], [5, 'red'], [10, 'black'], [23, 'red'], [8, 'black'], [30, 'red'], [11, 'black'],
         ]
 
-        // const ballLandedOnNumber = (): boolean => {
-
-        // }
-
-        sepMesh = scene.getMeshByName("Seperator")!;
-        const ballTouchingSeperator = (): void => {
-            if (ball.intersectsMesh(sepMesh, false, true)) {
-                // ball.physicsImpostor?.setLinearVelocity( Vector3.Zero() );
-                // ball.physicsImpostor?.setAngularVelocity( Vector3.Zero() );
-                const vel = ball.physicsImpostor?.getLinearVelocity()
-                // if (vel == null) return;
-                // if (vel.x > 0.1 || vel.y >0.1) ball.physicsImpostor?.setLinearVelocity( 
-                //     ball.physicsImpostor?.getLinearVelocity()!.scale(0.02)
-                // );
-
-                console.log('collision')
-                
+        let landed = false;
+        const checkBallLanded = (): void => {
+            if (ball.intersectsMesh(numbersMesh, false, true)) {
+                landed = true
+                ball.physicsImpostor?.setLinearVelocity( Vector3.Zero() );
+                ball.physicsImpostor?.setAngularVelocity( Vector3.Zero() );
             }
-
         }
 
-        // ball.actionManager?.registerAction(
-        //     new ExecuteCodeAction(
-        //         {
-        //             trigger: BABYLON.ActionManager.OnIntersectionEnterTrigger,
-        //             parameter: {
-        //                 mesh: sepMesh!,
-        //                 usePreciseIntersection: true
-        //             }
-        //         },
-        //         () => {
-        //             console.log("touching")
-        //             ball.physicsImpostor?.setLinearVelocity(Vector3.Zero())
-        //         },
-        //     ),
-        // );
-        scene.collisionsEnabled = false;
         scene.registerAfterRender(() => {
             if (spin) {
                 const angle = -(startAngularSpinSpeed - currFriction) * scene.getAnimationRatio()
                 if (Math.abs(angle) >= 0.002) {
                     movingMeshes[0].rotate(BABYLON.Axis.Y, angle, BABYLON.Space.LOCAL);
-                    rotateVerticies2(BABYLON.Quaternion.FromEulerAngles(0, angle, 0))
+
+                    const quat = BABYLON.Quaternion.FromEulerAngles(0, angle, 0)
+                    rotateVerticies2(quat)
+
+                    if (landed) {
+                        ball.position = ball.position.rotateByQuaternionAroundPointToRef(
+                            quat, Vector3.Zero(), ball.position
+                        )
+                    }
                 }
             }
 
-            ballTouchingSeperator()
+            checkBallLanded()
 
-            if (checkResult) {
+            if (checkResult && landed) {
                 if (ball.physicsImpostor?.getLinearVelocity()?.floor().equals(Vector3.Zero())) {
-                    console.log("checking")
                     for (let i = 0; i < shuffledGroupedVertices.length - 1; i++) {
                         const vertices = [...shuffledGroupedVertices[i], ...shuffledGroupedVertices[i + 1]];
                         const Xs = vertices.map((vect: any): number => {return vect.x})
-                        const Ys = vertices.map((vect: any): number => {return vect.y})
                         const Zs = vertices.map((vect: any): number => {return vect.z})
                         if (
                             ball.position.x >= Math.min(...Xs) &&
@@ -502,17 +434,21 @@ class PhysicsSceneWithAmmo implements CreateSceneClass {
                                 <h2 style="color: ${m[1]}">${m[0]}</h2>
                             ` 
                             checkResult = false;
+                            landed = false;
+
+                            reset()
                             break;
                         }
                     }
                 }
             }
+
+            console.log(checkResult)
             
             // stop the spinning of the table if friction has stopped it
             if (currFriction >= startAngularSpinSpeed && spin) {
                 spin = false;
                 checkResult = true;
-                drawDebugLines();
             }
             // otherwise keep spinning and applying friction
             else if (spin)
