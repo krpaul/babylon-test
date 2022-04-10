@@ -10,17 +10,9 @@ export interface CreateSceneModule {
     default: CreateSceneClass;
 }
 
-export const getSceneModuleWithName = (
-    name = 'defaultWithTexture'
-): Promise<CreateSceneClass> => {
-    return import('./scenes/' + name).then((module: CreateSceneModule)=> {
+export const getSceneModuleWithName = (): Promise<CreateSceneClass> => {
+    return import('./scenes/roulette').then((module: CreateSceneModule)=> {
         return module.default;
     });
-
-    // To build quicker, replace the above return statement with:
-
-    // return import('./scenes/defaultWithTexture').then((module: CreateSceneModule)=> {
-    //     return module.default;
-    // });
 };
 

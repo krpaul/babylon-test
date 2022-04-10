@@ -4,9 +4,6 @@ import { ArcRotateCamera } from "@babylonjs/core/Cameras/arcRotateCamera";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { HemisphericLight } from "@babylonjs/core/Lights/hemisphericLight";
 import { AmmoJSPlugin } from "@babylonjs/core/Physics/Plugins/ammoJSPlugin";
-import { OimoJSPlugin } from "@babylonjs/core/Physics/Plugins/oimoJSPlugin";
-import { BabylonFileLoaderConfiguration, CannonJSPlugin, ExecuteCodeAction } from "@babylonjs/core";
-import { AbstractMesh } from "@babylonjs/core";
 import "@babylonjs/core/Physics/physicsEngineComponent";
 
 // If you don't need the standard material you will still need to import it since the scene requires it.
@@ -18,6 +15,7 @@ import { CreateSceneClass } from "../createScene";
 
 import * as BABYLON from '@babylonjs/core';
 import { SceneLoader } from '@babylonjs/core/Loading/sceneLoader';
+import { double } from "@babylonjs/core";
 
 // required imports
 import "@babylonjs/core/Loading/loadingScreen";
@@ -27,38 +25,34 @@ import "@babylonjs/core/Materials/Textures/Loaders/envTextureLoader";
 
 import rouletteTableModel from '../../assets/glb/Roulette_Table_V5.glb'
 import roomEnvironment from "../../assets/environment/room.env"
-import { circleOfConfusionPixelShader } from "@babylonjs/core/Shaders/circleOfConfusion.fragment";
-import { allocateAndCopyTypedBuffer, double, float } from "@babylonjs/core";
-import { Quaternion } from "cannon";
-import { renderableTextureFormatToIndex } from "@babylonjs/core/Engines/WebGPU/webgpuTextureHelper";
 
-class PhysicsSceneWithAmmo implements CreateSceneClass {
+class Roulette implements CreateSceneClass {
     preTasks = [ammoReadyPromise];
 
     createScene = async (engine: Engine, canvas: HTMLCanvasElement): Promise<Scene> => {
         // This creates a basic Babylon Scene object (non-mesh)
         const scene = new Scene(engine);
-        
+
         const plugin = new AmmoJSPlugin(true, ammoModule)
         scene.enablePhysics(null, plugin);
         scene.getPhysicsEngine()?.setSubTimeStep(5);
-    
+
         // This creates and positions a free camera (non-mesh)
         const camera = new ArcRotateCamera("my first camera", 0, Math.PI / 3, 10, new Vector3(0, 0, 0), scene);
-    
+
         // This targets the camera to scene origin
         camera.setTarget(Vector3.Zero());
-    
+
         // This attaches the camera to the canvas
         camera.attachControl(canvas, true);
-    
+
         // This creates a light, aiming 0,1,0 - to the sky (non-mesh)
         const light = new HemisphericLight("light", new Vector3(0, 1, 0), scene);
-    
+
         // Default intensity is 1. Let's dim the light a small amount
         light.intensity = 0.7;
 
-        new BABYLON.EnvironmentHelper( {
+        new BABYLON.EnvironmentHelper({
             skyboxTexture: roomEnvironment,
             createGround: false
         }, scene)
@@ -94,11 +88,11 @@ class PhysicsSceneWithAmmo implements CreateSceneClass {
             scene,
             undefined,
             ".glb"
-            )
-            
+        )
+
         const fixedMeshes = result1.meshes
         fixedMeshes[0].setParent(null)
-            
+
         // load the roulette table
         // let movingMeshes: AbstractMesh[]; 
         const result2 = await SceneLoader.ImportMeshAsync(
@@ -109,7 +103,7 @@ class PhysicsSceneWithAmmo implements CreateSceneClass {
             undefined,
             ".glb"
         )
-        
+
         const movingMeshes = result2.meshes
         movingMeshes[0].setParent(null)
 
@@ -118,9 +112,9 @@ class PhysicsSceneWithAmmo implements CreateSceneClass {
                 mass: 0, friction: 0.45
             }, scene)
         })
-        
-        const numbersMesh = scene.getMeshByName("numbers"), 
-              seperatorsMesh = scene.getMeshByName("Seperator");
+
+        const numbersMesh = scene.getMeshByName("numbers"),
+            seperatorsMesh = scene.getMeshByName("Seperator");
 
         if (!numbersMesh || !seperatorsMesh) {
             throw new Error("Could not find numbers or seperators mesh")
@@ -130,7 +124,7 @@ class PhysicsSceneWithAmmo implements CreateSceneClass {
         let numberVertices: Vector3[] = [];
         let groupedVertices: Vector3[][] = [];
         let shuffledGroupedVertices: Vector3[][] = []
-        
+
         const defaultNumberRotation = new BABYLON.Quaternion(0, 1, 0, 0);
 
         (movingMeshes[0] as any).physicsImposter = new BABYLON.PhysicsImpostor(movingMeshes[0], BABYLON.PhysicsImpostor.MeshImpostor, {
@@ -147,7 +141,7 @@ class PhysicsSceneWithAmmo implements CreateSceneClass {
             numberVertices = [];
             groupedVertices = [];
             shuffledGroupedVertices = [];
-            
+
             for (let i = 0; i < v.length; i += 3) {
                 numberVerticesRaw.push(
                     Vector3.FromArray(v, i)
@@ -178,39 +172,33 @@ class PhysicsSceneWithAmmo implements CreateSceneClass {
                     numberVertices[i + 1]
                 ])
             }
-            
+
             // sort
             groupedVertices.sort((a, b) => {
                 return a[0].x - b[0].x
             })
-            
+
             // reaarrange the grouped verticies like a shuffle
             for (let i = 0; i < groupedVertices.length; i += 2) shuffledGroupedVertices.push(groupedVertices[i])
             for (let i = groupedVertices.length - 2; i > 0; i -= 2) shuffledGroupedVertices.push(groupedVertices[i])
-            
-            console.log("Calculated vertices")
         }
 
         calculateVertices()
 
         // rotates vertices around the origin by given radians
         const rotateVerticies = (angleRad: double) => {
-            console.log(
-                "divided angle: ", angleRad % (Math.PI * 2)
-            )
-
-            angleRad %= Math.PI*2
+            angleRad %= Math.PI * 2
 
             for (let i = 0; i < shuffledGroupedVertices.length; i++) {
                 for (let j = 0; j < shuffledGroupedVertices[i].length; j++) {
                     const v = shuffledGroupedVertices[i][j]
                     const newV = v.clone()
 
-                    const newAngle = Math.atan2( newV.z, newV.x ) + angleRad;
-                    const distance = Math.sqrt( newV.x ** 2 + newV.z ** 2 );
+                    const newAngle = Math.atan2(newV.z, newV.x) + angleRad;
+                    const distance = Math.sqrt(newV.x ** 2 + newV.z ** 2);
 
-                    newV.x = distance * Math.cos( newAngle );
-                    newV.z = distance * Math.sin( newAngle );
+                    newV.x = distance * Math.cos(newAngle);
+                    newV.z = distance * Math.sin(newAngle);
 
                     shuffledGroupedVertices[i][j] = newV
                 }
@@ -227,25 +215,25 @@ class PhysicsSceneWithAmmo implements CreateSceneClass {
         }
 
         // create 37 colors in rainbow order
-        const colors = [new BABYLON.Color4(0, 1,0,1), new BABYLON.Color4(0, 0.5,0.5,1)]
-        for (let i = 0; i < 34; i++ ) colors.push(new BABYLON.Color4(1, i * 6 / 255, 0, 1 ))
-        colors.push(new BABYLON.Color4(0, 0, 1, 1 ))
+        const colors = [new BABYLON.Color4(0, 1, 0, 1), new BABYLON.Color4(0, 0.5, 0.5, 1)]
+        for (let i = 0; i < 34; i++) colors.push(new BABYLON.Color4(1, i * 6 / 255, 0, 1))
+        colors.push(new BABYLON.Color4(0, 0, 1, 1))
 
         // create lines 
         const lines: BABYLON.LinesMesh[] = [];
-        const drawDebugLines = (noclear=false) => {
+        const drawDebugLines = (noclear = false) => {
             if (!noclear) lines.forEach((l) => {
                 l.dispose()
             })
-            
-            for (let i=0; i<lines.length; i++) {
+
+            for (let i = 0; i < lines.length; i++) {
                 delete lines[i];
             }
-            
+
             for (let i = 0; i < shuffledGroupedVertices.length - 1; i++) {
-                const v = shuffledGroupedVertices[i].map((vect: any): Vector3 => {return vect.clone()})
-                const v1 = shuffledGroupedVertices[i + 1].map((vect: any): Vector3 => {return vect.clone()})
-    
+                const v = shuffledGroupedVertices[i].map((vect: any): Vector3 => { return vect.clone() })
+                const v1 = shuffledGroupedVertices[i + 1].map((vect: any): Vector3 => { return vect.clone() })
+
                 v[0].y += 2
                 v[1].y += 2
                 v1[0].y += 2
@@ -258,11 +246,11 @@ class PhysicsSceneWithAmmo implements CreateSceneClass {
                 }, scene))
             }
         }
-        
+
         const drawSeperatorMeshBounds = () => {
             const v = seperatorsMesh.getVerticesData(BABYLON.VertexBuffer.PositionKind)!
             const verticiesRaw: Vector3[] = [];
-            
+
             for (let i = 0; i < v.length; i += 3) {
                 verticiesRaw.push(
                     Vector3.FromArray(v, i)
@@ -279,8 +267,6 @@ class PhysicsSceneWithAmmo implements CreateSceneClass {
                     colors: [new BABYLON.Color4(1, 0, 0, 1), new BABYLON.Color4(1, 0, 0, 1)]
                 }, scene)
             }
-
-            console.log(v)
         }
 
         // invisible barrier so that ball doesn't fly away to narnia
@@ -288,30 +274,30 @@ class PhysicsSceneWithAmmo implements CreateSceneClass {
             height: 0.01,
             width: 6,
             depth: 6,
-    
+
         }, scene);
-        
+
         // add collider
         barrier.physicsImpostor = new BABYLON.PhysicsImpostor(barrier, BABYLON.PhysicsImpostor.BoxImpostor, {
             mass: 0,
         }, scene);
-        
+
         // set material to invisible
         barrier.material = new BABYLON.StandardMaterial("barrier", scene);
         barrier.material.alpha = 0;
-        
+
         // set pos
         barrier.position.y = 0.4;
-        
+
         // Our built-in 'sphere' shape.
         const ball = BABYLON.MeshBuilder.CreateSphere(
             "ball",
             { diameter: 0.14, segments: 10 },
             scene
         );
-        
-        ball.physicsImpostor = new PhysicsImpostor(ball, PhysicsImpostor.SphereImpostor, { 
-            mass: 20, 
+
+        ball.physicsImpostor = new PhysicsImpostor(ball, PhysicsImpostor.SphereImpostor, {
+            mass: 20,
             restitution: 0,
         }, scene);
 
@@ -320,7 +306,7 @@ class PhysicsSceneWithAmmo implements CreateSceneClass {
 
         // weirdly we need to use Ammo.js itself to set restitution
         plugin.setBodyRestitution(ball.physicsImpostor, 0)
-        
+
         const ballStart = new Vector3(2, 0.3, 0)
         const startAngularSpinSpeed: double = 0.03; // radians per frame
         const angularSpinFriction: double = 0.00001 // - radians per frame per frame
@@ -337,8 +323,8 @@ class PhysicsSceneWithAmmo implements CreateSceneClass {
             calculateVertices()
 
             ball.position = ballStart;
-            ball.physicsImpostor?.setAngularVelocity( Vector3.Zero() );
-            ball.physicsImpostor?.setLinearVelocity( 
+            ball.physicsImpostor?.setAngularVelocity(Vector3.Zero());
+            ball.physicsImpostor?.setLinearVelocity(
                 new Vector3(0, ballStart.y, 0)
             );
 
@@ -389,8 +375,8 @@ class PhysicsSceneWithAmmo implements CreateSceneClass {
         const checkBallLanded = (): void => {
             if (ball.intersectsMesh(numbersMesh, false, true)) {
                 landed = true
-                ball.physicsImpostor?.setLinearVelocity( Vector3.Zero() );
-                ball.physicsImpostor?.setAngularVelocity( Vector3.Zero() );
+                ball.physicsImpostor?.setLinearVelocity(Vector3.Zero());
+                ball.physicsImpostor?.setAngularVelocity(Vector3.Zero());
             }
         }
 
@@ -417,22 +403,19 @@ class PhysicsSceneWithAmmo implements CreateSceneClass {
                 if (ball.physicsImpostor?.getLinearVelocity()?.floor().equals(Vector3.Zero())) {
                     for (let i = 0; i < shuffledGroupedVertices.length - 1; i++) {
                         const vertices = [...shuffledGroupedVertices[i], ...shuffledGroupedVertices[i + 1]];
-                        const Xs = vertices.map((vect: any): number => {return vect.x})
-                        const Zs = vertices.map((vect: any): number => {return vect.z})
+                        const Xs = vertices.map((vect: any): number => { return vect.x })
+                        const Zs = vertices.map((vect: any): number => { return vect.z })
                         if (
                             ball.position.x >= Math.min(...Xs) &&
                             ball.position.x <= Math.max(...Xs) &&
                             ball.position.z >= Math.min(...Zs) &&
-                            ball.position.z <= Math.max(...Zs) 
-                        
+                            ball.position.z <= Math.max(...Zs)
+
                         ) {
                             const m: any = mapping[i];
-
-                            console.log(i)
-
                             document.getElementById("l")!.innerHTML += `
                                 <h2 style="color: ${m[1]}">${m[0]}</h2>
-                            ` 
+                            `
                             checkResult = false;
                             landed = false;
 
@@ -443,8 +426,6 @@ class PhysicsSceneWithAmmo implements CreateSceneClass {
                 }
             }
 
-            console.log(checkResult)
-            
             // stop the spinning of the table if friction has stopped it
             if (currFriction >= startAngularSpinSpeed && spin) {
                 spin = false;
@@ -463,24 +444,24 @@ class PhysicsSceneWithAmmo implements CreateSceneClass {
                 launchStopFrameCount = 0;
             }
         })
-    
+
         return scene;
     };
 
     randomMat = (scene_: Scene, i: number): BABYLON.StandardMaterial => {
-            const acryl_mat = new BABYLON.StandardMaterial("acryl_"+i, scene_);
-            
-            acryl_mat.diffuseColor = new BABYLON.Color3(Math.random(), Math.random(), Math.random());
-            acryl_mat.specularColor = new BABYLON.Color3(Math.random(), Math.random(), Math.random());
-            acryl_mat.emissiveColor = new BABYLON.Color3(Math.random(), Math.random(), Math.random());
-            acryl_mat.ambientColor = new BABYLON.Color3(Math.random(), Math.random(), Math.random());
+        const acryl_mat = new BABYLON.StandardMaterial("acryl_" + i, scene_);
 
-            return acryl_mat
+        acryl_mat.diffuseColor = new BABYLON.Color3(Math.random(), Math.random(), Math.random());
+        acryl_mat.specularColor = new BABYLON.Color3(Math.random(), Math.random(), Math.random());
+        acryl_mat.emissiveColor = new BABYLON.Color3(Math.random(), Math.random(), Math.random());
+        acryl_mat.ambientColor = new BABYLON.Color3(Math.random(), Math.random(), Math.random());
+
+        return acryl_mat
     }
 
     ballMaterial = (scene_: Scene): BABYLON.StandardMaterial => {
         const acryl_mat = new BABYLON.StandardMaterial("acryl", scene_);
-        
+
         acryl_mat.diffuseColor = new BABYLON.Color3(1, 0, 1);
         acryl_mat.specularColor = new BABYLON.Color3(0.5, 0.6, 0.87);
         acryl_mat.emissiveColor = new BABYLON.Color3(1, 1, 1);
@@ -491,9 +472,9 @@ class PhysicsSceneWithAmmo implements CreateSceneClass {
 
     getSlope = (x1: number, y1: number, x2: number, y2: number): number => {
         const rise = y2 - y1;
-        const run  = x2 - x1;
-        return rise/run;
+        const run = x2 - x1;
+        return rise / run;
     }
 }
 
-export default new PhysicsSceneWithAmmo();
+export default new Roulette();
